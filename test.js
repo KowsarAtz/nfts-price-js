@@ -3,7 +3,7 @@ const { getFloorPrice } = require("./nft-floor-price.js");
 
 const main = async () => {
     // Example 1: Getting Latest and Average Price over a period of time (optional) for a specific token
-    priceData = await getTokenPriceData(
+    let priceData = await getTokenPriceData(
         "0x000e49c87d2874431567d38ff9548890ab39baac",
         "10153",
         1642920101,
