@@ -2,16 +2,10 @@
   "name": "nfts-price",
   "version": "1.0.0",
   "description": "",
-  "main": "muon-nft-data.js",
-  "type": "module",
+  "main": "index.js",
   "dependencies": {
-    "data-uri-to-buffer": "^4.0.0",
-    "fetch-blob": "^3.1.5",
-    "formdata-polyfill": "^4.0.10",
     "js-big-decimal": "^1.3.4",
-    "node-domexception": "^1.0.0",
-    "node-fetch": "^3.2.3",
-    "web-streams-polyfill": "^3.2.0"
+    "node-fetch": "^2.6.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
