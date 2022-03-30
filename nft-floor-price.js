@@ -1,6 +1,10 @@
 const bigDecimal = require("js-big-decimal");
 const { executeQuery } = require("./graphql.js");
-const { ETH_TO_WEI, DIVISION_PRECISION } = require("./constants.js");
+const {
+    ETH_TO_WEI,
+    DIVISION_PRECISION,
+    checkTimePeriod,
+} = require("./constants.js");
 
 const getFloorPrice = async (
     collection,
@@ -8,6 +12,7 @@ const getFloorPrice = async (
     toTimestamp = null,
     tokenId = null
 ) => {
+    checkTimePeriod(fromTimestamp, toTimestamp);
     const timeFilter =
         fromTimestamp == null || toTimestamp == null
             ? ""

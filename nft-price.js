@@ -1,6 +1,11 @@
 const bigDecimal = require("js-big-decimal");
 const { executeQuery } = require("./graphql.js");
-const { PAGE_SIZE, ETH_TO_WEI, DIVISION_PRECISION } = require("./constants.js");
+const {
+    PAGE_SIZE,
+    ETH_TO_WEI,
+    DIVISION_PRECISION,
+    checkTimePeriod,
+} = require("./constants.js");
 
 const getTokenPartialPrices = async (
     collection,
@@ -56,6 +61,7 @@ const getTokenPriceData = async (
     fromTimestamp = null,
     toTimestamp = null
 ) => {
+    checkTimePeriod(fromTimestamp, toTimestamp);
     const prices = await getTokenPrices(
         collection,
         tokenId,
