@@ -6,9 +6,10 @@ const SUBGRAPH_ENDPOINT =
     "https://api.thegraph.com/subgraphs/name/kowsaratz/muon-data-test";
 
 const checkTimePeriod = (from, to) => {
-    if (from == null && to == null) return;
-    if (from == null || to == null || from > to)
+    if (from != null && to != null && from > to)
         throw new Error("invalid time period");
+    const now = Math.floor(Date.now() / 1000);
+    return to == null || to > now ? now : to; 
 };
 
 module.exports = {

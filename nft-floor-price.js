@@ -12,11 +12,8 @@ const getFloorPrice = async (
     toTimestamp = null,
     tokenId = null
 ) => {
-    checkTimePeriod(fromTimestamp, toTimestamp);
-    const timeFilter =
-        fromTimestamp == null || toTimestamp == null
-            ? ""
-            : `, timestamp_gte: ${fromTimestamp}, timestamp_lte: ${toTimestamp}`;
+    toTimestamp = checkTimePeriod(fromTimestamp, toTimestamp);
+    const timeFilter = (fromTimestamp != null ? `, timestamp_gte: ${fromTimestamp}, ` : "") +  `timestamp_lte: ${toTimestamp}`;
 
     const tokenFilter =
         tokenId == null

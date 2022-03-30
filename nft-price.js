@@ -16,13 +16,12 @@ const getTokenPartialPrices = async (
     first = PAGE_SIZE
 ) => {
     const timeFilter =
-        fromTimestamp == null || toTimestamp == null
-            ? ""
-            : `, where: {timestamp_gte: ${fromTimestamp}, timestamp_lte: ${toTimestamp}}`;
+        `${fromTimestamp != null ? `timestamp_gte: ${fromTimestamp}, ` : ""}` +
+        `timestamp_lte: ${toTimestamp}`;
 
     const query = `{
         token(id: "${collection}:${tokenId}"){
-            sales (skip: ${skip}, first: ${first} , orderBy: timestamp, orderDirection: desc${timeFilter}) {
+            sales (skip: ${skip}, first: ${first} , orderBy: timestamp, orderDirection: desc, where: {${timeFilter}}) {
                 price
             }
         }
@@ -61,7 +60,7 @@ const getTokenPriceData = async (
     fromTimestamp = null,
     toTimestamp = null
 ) => {
-    checkTimePeriod(fromTimestamp, toTimestamp);
+    toTimestamp = checkTimePeriod(fromTimestamp, toTimestamp);
     const prices = await getTokenPrices(
         collection,
         tokenId,
