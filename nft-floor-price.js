@@ -13,7 +13,7 @@ const getFloorPrice = async (
     tokenId = null
 ) => {
     toTimestamp = checkTimePeriod(fromTimestamp, toTimestamp);
-    const timeFilter = (fromTimestamp != null ? `, timestamp_gte: ${fromTimestamp}, ` : "") +  `timestamp_lte: ${toTimestamp}`;
+    const timeFilter = (fromTimestamp != null ? `timestamp_gte: ${fromTimestamp}, ` : "") +  `timestamp_lte: ${toTimestamp}`;
 
     const tokenFilter =
         tokenId == null
@@ -21,10 +21,12 @@ const getFloorPrice = async (
             : `token: "${collection.toLowerCase()}:${tokenId}"`;
 
     const query = `{
-        sales(first: 1, orderBy: price, orderDirection: asc, where : {${tokenFilter}${timeFilter}}){
+        sales(first: 1, orderBy: price, orderDirection: asc, where : {${tokenFilter}, ${timeFilter}}){
             price
         }
     }`;
+
+    console.log(query)
 
     const sales = (await executeQuery(query))?.data?.sales;
 
