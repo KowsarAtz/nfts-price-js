@@ -26,8 +26,6 @@ const getFloorPrice = async (
         }
     }`;
 
-    console.log(query)
-
     const sales = (await executeQuery(query))?.data?.sales;
 
     if (sales == null || sales.length == 0)
