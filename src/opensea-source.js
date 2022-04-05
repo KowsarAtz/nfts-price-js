@@ -3,40 +3,75 @@ const { executeQuery } = require("./subgraph-client");
 const {
     DIVISION_PRECISION,
     SUBGRAPH_ENDPOINT,
-    ETH_ID, WETH_ID,
-    checkTimePeriod,
 } = require("./constants.js");
 
 const PAGE_SIZE = 1000;
 
-const getTokenPrice = async (
-    collection,
-    tokenId,
-    fromTimestamp = null,
-    toTimestamp = null
-) => {
-    const now = Math.floor(Date.now() / 1000);
-    if (toTimestamp == null || toTimestamp > now)
-        toTimestamp = now; 
+const getSales = async (
+    collection, tokenId,
+    fromTimestamp = null, toTimestamp = null,
+    fromPrice = null, toPrice = null,
+    order = null, desc = null,
+    limit = null, offset = null
+) =>
+{
+    if (limit == null)
+        limit = 10;
+    
+    const sales = await fetchSales(collection, tokenId,
+        fromTimestamp, toTimestamp,
+        fromPrice, toPrice,
+        prepareOrder(order), desc,
+        limit, offset);
 
-    // const allSales = [];
+    return sales.map(sale => {
+        return {
+            collection: sale.collection,
+            tokenId: sale.tokenId,
+            price: bigDecimal.divide(sale.usdtPrice, 1000000, DIVISION_PRECISION),
+            time: sale.timestamp
+        }
+    });
+}
+
+const getLastSale = async (
+    collection, tokenId,
+    fromTimestamp = null, toTimestamp = null,
+    fromPrice = null, toPrice = null
+) =>
+{
+    const sales = await getSales(collection, tokenId,
+        fromTimestamp, toTimestamp,
+        fromPrice, toPrice,
+        "time", true, 1, 0)
+    if (sales == null || sales.length == 0)
+        return null;
+    return sales[0];
+}
+
+const getAveragePrice = async (
+    collection, tokenId,
+    fromTimestamp, toTimestamp,
+    fromPrice = null, toPrice = null
+) => {
+    if (fromTimestamp == null || toTimestamp == null)
+        throw new Error("time range must be provided");
+
+    let sum = 0;
     let count = 0;
-    let lastSale = null;
     let lastFetchedResultCount = PAGE_SIZE;
 
-    while (lastFetchedResultCount >= PAGE_SIZE) {
-        const sales = await fetchTokenPrices(
-            collection,
-            tokenId,
-            fromTimestamp,
-            toTimestamp,
-            count
+    while (lastFetchedResultCount >= PAGE_SIZE && count <= 5000) {
+        const sales = await getSales(
+            collection, tokenId,
+            fromTimestamp, toTimestamp,
+            fromPrice, toPrice,
+            null, null, PAGE_SIZE, count
         );
         if (sales == null)
             break;
-
-        if (count == 0 && sales.length != 0)
-            lastSale = sales[0];
+        
+        sum = sales.map(sale => sale.price).reduce((p, c) => bigDecimal.add(p, c), sum);
         
         lastFetchedResultCount = sales.length;
         count += lastFetchedResultCount;
@@ -45,38 +80,22 @@ const getTokenPrice = async (
     if (count == 0)
         return null;
 
-    const paymentToken = lastSale.paymentToken;
-
     return {
-        lastSalePrice: bigDecimal.divide(lastSale.price, Math.pow(10, paymentToken.decimals), DIVISION_PRECISION),
-        lastSaleToken: paymentToken.symbol,
-        lastSaleUsdtPrice: bigDecimal.divide(lastSale.usdtPrice, 1000000, DIVISION_PRECISION),
-        lastSaleTime: lastSale.timestamp,
-        totalSales: count
+        average: bigDecimal.divide(sum, count, DIVISION_PRECISION),
+        count: count
     };
 };
 
 const getFloorPrice = async (
-    collection,
-    tokenId = null,
-    fromTimestamp = null,
-    toTimestamp = null
+    collection, tokenId = null,
+    fromTimestamp = null, toTimestamp = null
 ) => {
-    const sales = await fetchFloorPrice(collection, tokenId, fromTimestamp, toTimestamp);
+    const sales = await getSales(collection, tokenId, fromTimestamp, toTimestamp, null, null, "price", false, 1, 0);
 
     if (sales == null || sales.length == 0)
         return null;
 
-    const sale = sales[0];
-    const paymentToken = sale.paymentToken;
-
-    return {
-        tokenId: sale.tokenId,
-        price: bigDecimal.divide(sale.price, Math.pow(10, paymentToken.decimals), DIVISION_PRECISION),
-        paymentToken: paymentToken.symbol,
-        usdtPrice: bigDecimal.divide(sale.usdtPrice, 1000000, DIVISION_PRECISION),
-        time: sale.timestamp
-    };
+    return sales[0];
 };
 
 
@@ -108,9 +127,10 @@ const fetchFloorPrice = async (
 const fetchSales = async (
     collection,
     tokenId,
-    paymentTokenIds,
     fromTimestamp,
     toTimestamp,
+    fromPrice,
+    toPrice,
     order,
     desc,
     limit,
@@ -121,17 +141,13 @@ const fetchSales = async (
         filters.push(`collection: \"${collection}\"`);
     if (tokenId != null)
         filters.push(`tokenId: \"${tokenId}\"`);
-    if (paymentTokenIds != null && paymentTokenIds.length != 0) {
-        const tokens = paymentTokenIds.map(token => `"${token}"`).join(", ");
-        filters.push(`paymentToken_in: [${tokens}]`);
-    }
     filters.push(...getTimestampFilters(fromTimestamp, toTimestamp));
+    filters.push(...getPriceFilters(fromPrice, toPrice));
 
     const criteria = [];
     if (offset != null)
         criteria.push(`skip: ${offset}`);
-    if (limit != null)
-        criteria.push(`first: ${limit}`);
+    criteria.push(`first: ${limit == null ? PAGE_SIZE : limit}`);
     if (order != null)
         criteria.push(`orderBy: ${order}`);
     if (desc != null)
@@ -141,6 +157,7 @@ const fetchSales = async (
 
     const query = `{
         sales(${criteria.join(", ")}){
+            collection
             tokenId
             timestamp
             price
@@ -156,7 +173,8 @@ const fetchSales = async (
 }
 
 const getTimestampFilters = (fromTimestamp, toTimestamp) => {
-    checkTimePeriod(fromTimestamp, toTimestamp);
+    if (fromTimestamp != null && toTimestamp != null && fromTimestamp > toTimestamp)
+        throw new Error("invalid time period");
     const filters = [];
     if (fromTimestamp != null)
         filters.push(`timestamp_gte: ${fromTimestamp}`);
@@ -165,7 +183,33 @@ const getTimestampFilters = (fromTimestamp, toTimestamp) => {
     return filters;
 }
 
+const getPriceFilters = (fromPrice, toPrice) => {
+    if (fromPrice != null && toPrice != null && fromPrice > toPrice)
+        throw new Error("invalid price range");
+    const filters = [];
+    if (fromPrice != null)
+        filters.push(`usdtPrice_gte: ${fromPrice}`);
+    if (toPrice != null)
+        filters.push(`usdtPrice_lt: ${toPrice}`);
+    return filters;
+}
+
+const prepareOrder = (order) => {
+    if (order == null)
+        return null;
+    switch (order) {
+        case "time":
+            return "timestamp";
+        case "price":
+            return "usdtPrice"
+        default:
+            throw new Error("Invalid order field");
+    }
+}
+
 module.exports = {
-    getTokenPrice,
+    getSales,
+    getLastSale,
+    getAveragePrice,
     getFloorPrice,
 };
